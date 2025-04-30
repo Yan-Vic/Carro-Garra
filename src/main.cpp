@@ -4,15 +4,19 @@
 #include <ESP32Servo.h>
 #include <Stepper.h>
 
-// ——————————————————————————————————————————————
 //  1) Definição de pinos
-// ——————————————————————————————————————————————
 const int BUZZER_PIN = 23;
 const int BUZZER_CHANNEL = 0;
 
 #define BT_P1 5
 #define BT_P2 18
-#define BT_P3 32 // Corrigido: evitar redefinição
+#define BT_P3 19
+
+#define LED_P1    17
+#define LED_P2    16
+#define LED_P3     4
+#define LED_WAIT  13
+#define LED_ERRO  33
 
 #define STEPPER_PIN_1 26
 #define STEPPER_PIN_2 27
@@ -26,14 +30,8 @@ const int BUZZER_CHANNEL = 0;
 #define LCD_LINES 2
 
 //  2) Mapeamento de estações
-enum Station
-{
-  P1 = 1,
-  P2 = 2,
-  P3 = 3
-};
-Station currentStation = P2;
-Station targetStation;
+ int currentStation = 2;
+ int targetStation;
 
 //  3) Estados da máquina
 enum State
@@ -53,7 +51,6 @@ Servo gripperServo;
 //  5) Display LCD
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-//  Protótipos
 void checkButtons();
 void openGripper();
 void moveToTarget();
@@ -71,11 +68,12 @@ void setup()
   pinMode(BT_P3, INPUT_PULLUP);
 
   gripperServo.attach(CLAW_SERVO);
-  gripperServo.write(0); // posição fechada (corrigido)
+  gripperServo.write(90); // posição fechada (corrigido)
 
   movementStepper.setSpeed(20); // velocidade adequada
 
-  lcd.begin(16, 2);
+  lcd.init(); 
+  //lcd.begin(16, 2);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Sistema iniciado");
@@ -93,14 +91,14 @@ void loop()
   case REST:
     checkButtons();
     break;
-  case OPEN_GRIPPER:
-    openGripper();
-    break;
+  case CLOSE_GRIPPER:
+    closeGripper();
+    break; 
   case MOVING:
     moveToTarget();
     break;
-  case CLOSE_GRIPPER:
-    closeGripper();
+  case OPEN_GRIPPER:
+    openGripper();
     break;
   }
 }
@@ -109,11 +107,11 @@ void loop()
 void checkButtons()
 {
   if (digitalRead(BT_P1) == LOW)
-    targetStation = P1;
+    targetStation = 1;
   else if (digitalRead(BT_P2) == LOW)
-    targetStation = P2;
+    targetStation = 2;
   else if (digitalRead(BT_P3) == LOW)
-    targetStation = P3;
+    targetStation = 3;
   else
     return;
 
@@ -125,50 +123,61 @@ void checkButtons()
     lcd.print(targetStation);
 
     Serial.printf("Selecionado P%d\n", targetStation);
-    state = OPEN_GRIPPER;
+    state = CLOSE_GRIPPER;
+  }
+  else if(targetStation == currentStation && (digitalRead(BT_P1) == LOW || digitalRead(BT_P2) == LOW ||digitalRead(BT_P3) == LOW)) {
+    state = MOVING;
   }
 }
-
-// ——————————————————————————————————————————————
-//  b) Abrir a garra
-// ——————————————————————————————————————————————
-void openGripper()
+//  b) Fechar garra
+void closeGripper()
 {
-  Serial.println("Abrindo garra...");
-  gripperServo.write(180);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Fechando Garra...");
+  Serial.println("Fechando garra...");
+  gripperServo.write(90);
   delay(500);
   state = MOVING;
 }
 
-// ——————————————————————————————————————————————
 //  c) Mover o motor de passo
-// ——————————————————————————————————————————————
 void moveToTarget()
 {
   int delta = targetStation - currentStation;
 
-  if (delta > 0)
+  if (delta != 0)
   {
-    Serial.println("Movendo para DIREITA");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.printf("Movendo para P%d\n",targetStation);
+    lcd.setCursor(0, 1);
+    lcd.print("Aguarde...");
+    Serial.printf("Movendo para P%d\n", targetStation);
     movementStepper.step(stepsPerRevolution * delta);
-  }
-  else if (delta < 0)
+    delay(3000);
+    currentStation = targetStation;
+    Serial.printf("Chegou em P%d\n", currentStation);
+    state = OPEN_GRIPPER;
+  } 
+  else
   {
-    Serial.println("Movendo para ESQUERDA");
-    movementStepper.step(stepsPerRevolution * delta); // negativo
-  }
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Erro: Selecione");
+    lcd.setCursor(0, 1);
+    lcd.print("um Local Valido");
+    Serial.println("O carro já se encontra no local requesitado");
+    delay(1000);
+    state = REST;
 
-  currentStation = targetStation;
-  Serial.printf("Chegou em P%d\n", currentStation);
-  state = CLOSE_GRIPPER;
+  }
 }
 
-// ——————————————————————————————————————————————
-//  d) Fechar garra
-// ——————————————————————————————————————————————
-void closeGripper()
+//  d) Abrir a garra
+void openGripper()
 {
-  Serial.println("Fechando garra...");
+  Serial.println("Abrindo garra...");
   gripperServo.write(180);
   delay(500);
   state = REST;
