@@ -12,11 +12,11 @@ const int BUZZER_CHANNEL = 0;
 #define BT_P2 18
 #define BT_P3 19
 
-#define LED_P1    17
-#define LED_P2    16
-#define LED_P3     4
-#define LED_WAIT  13
-#define LED_ERRO  33
+#define LED_P1 17
+#define LED_P2 16
+#define LED_P3 4
+#define LED_WAIT 13
+#define LED_ERRO 33
 
 #define STEPPER_PIN_1 26
 #define STEPPER_PIN_2 27
@@ -30,8 +30,8 @@ const int BUZZER_CHANNEL = 0;
 #define LCD_LINES 2
 
 //  2) Mapeamento de estações
- int currentStation = 2;
- int targetStation;
+int currentStation = 2;
+int targetStation;
 
 //  3) Estados da máquina
 enum State
@@ -67,18 +67,29 @@ void setup()
   pinMode(BT_P2, INPUT_PULLUP);
   pinMode(BT_P3, INPUT_PULLUP);
 
+  pinMode(LED_P1, OUTPUT);
+  pinMode(LED_P2, OUTPUT);
+  pinMode(LED_P3, OUTPUT);
+  pinMode(LED_WAIT, OUTPUT);
+  pinMode(LED_ERRO, OUTPUT);
+
   gripperServo.attach(CLAW_SERVO);
   gripperServo.write(90); // posição fechada (corrigido)
 
   movementStepper.setSpeed(20); // velocidade adequada
 
-  lcd.init(); 
-  //lcd.begin(16, 2);
+  lcd.begin(16, 2);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Sistema iniciado");
   lcd.setCursor(0, 1);
-  lcd.print("Estado: REPOUSO");
+  lcd.print("Carro em P2");
+
+  digitalWrite(LED_P1, LOW);
+  digitalWrite(LED_P2, HIGH);
+  digitalWrite(LED_P3, LOW);
+  digitalWrite(LED_WAIT, LOW);
+  digitalWrite(LED_ERRO, LOW);
 
   Serial.println("Sistema de transporte iniciado. Estado: REPOUSO");
 }
@@ -93,7 +104,7 @@ void loop()
     break;
   case CLOSE_GRIPPER:
     closeGripper();
-    break; 
+    break;
   case MOVING:
     moveToTarget();
     break;
@@ -125,13 +136,16 @@ void checkButtons()
     Serial.printf("Selecionado P%d\n", targetStation);
     state = CLOSE_GRIPPER;
   }
-  else if(targetStation == currentStation && (digitalRead(BT_P1) == LOW || digitalRead(BT_P2) == LOW ||digitalRead(BT_P3) == LOW)) {
+  else if (targetStation == currentStation && (digitalRead(BT_P1) == LOW || digitalRead(BT_P2) == LOW || digitalRead(BT_P3) == LOW))
+  {
     state = MOVING;
   }
 }
 //  b) Fechar garra
 void closeGripper()
 {
+  digitalWrite(LED_P1, LOW);
+  digitalWrite(LED_P2, HIGH);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Fechando Garra...");
@@ -150,7 +164,7 @@ void moveToTarget()
   {
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.printf("Movendo para P%d\n",targetStation);
+    lcd.printf("Movendo para P%d\n", targetStation);
     lcd.setCursor(0, 1);
     lcd.print("Aguarde...");
     Serial.printf("Movendo para P%d\n", targetStation);
@@ -159,7 +173,7 @@ void moveToTarget()
     currentStation = targetStation;
     Serial.printf("Chegou em P%d\n", currentStation);
     state = OPEN_GRIPPER;
-  } 
+  }
   else
   {
     lcd.clear();
@@ -170,7 +184,6 @@ void moveToTarget()
     Serial.println("O carro já se encontra no local requesitado");
     delay(1000);
     state = REST;
-
   }
 }
 
